@@ -67,7 +67,7 @@ export const writeQuotaUiState = (state: QuotaUiState) => {
  */
 export type QuotaPreferences = {
   showEmails: boolean;
-  /** Meters show usage (default) or what is left. */
+  /** Meters show what is left (default) or usage. */
   displayMode: QuotaDisplayMode;
   /** View on a single provider tab. */
   viewMode: QuotaViewMode;
@@ -82,9 +82,16 @@ export type QuotaPreferences = {
 
 const QUOTA_PREFERENCES_KEY = 'quotaPage.preferences';
 
+/**
+ * Stored field for `displayMode`. Every write saved the whole object, so the
+ * old `displayMode` field holds the former `used` default for anyone who never
+ * picked a view; a new field lets the remaining default reach them.
+ */
+const DISPLAY_MODE_FIELD = 'meterView';
+
 const DEFAULT_QUOTA_PREFERENCES: QuotaPreferences = {
   showEmails: false,
-  displayMode: 'used',
+  displayMode: 'remaining',
   viewMode: 'ledger',
   allViewMode: 'cards',
   forecastLookbackHours: 24,
@@ -107,7 +114,7 @@ export const readQuotaPreferences = (): QuotaPreferences => {
     const parsed = JSON.parse(window.localStorage.getItem(QUOTA_PREFERENCES_KEY) ?? '{}');
     return {
       showEmails: parsed.showEmails === true,
-      displayMode: oneOf(QUOTA_DISPLAY_MODES, parsed.displayMode, defaults.displayMode),
+      displayMode: oneOf(QUOTA_DISPLAY_MODES, parsed[DISPLAY_MODE_FIELD], defaults.displayMode),
       viewMode: oneOf(QUOTA_VIEW_MODES, parsed.viewMode, defaults.viewMode),
       allViewMode: oneOf(QUOTA_VIEW_MODES, parsed.allViewMode, defaults.allViewMode),
       forecastLookbackHours: oneOf(
@@ -126,8 +133,11 @@ export const readQuotaPreferences = (): QuotaPreferences => {
 export const writeQuotaPreferences = (preferences: Partial<QuotaPreferences>) => {
   if (typeof window === 'undefined') return;
   try {
-    const next = { ...readQuotaPreferences(), ...preferences };
-    window.localStorage.setItem(QUOTA_PREFERENCES_KEY, JSON.stringify(next));
+    const { displayMode, ...rest } = { ...readQuotaPreferences(), ...preferences };
+    window.localStorage.setItem(
+      QUOTA_PREFERENCES_KEY,
+      JSON.stringify({ ...rest, [DISPLAY_MODE_FIELD]: displayMode })
+    );
   } catch {
     // ignore
   }
