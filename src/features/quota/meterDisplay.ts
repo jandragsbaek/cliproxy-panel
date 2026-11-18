@@ -1,7 +1,7 @@
 /**
  * How quota meters read on the quota page.
  *
- * - `mode`: show usage (`used`, the default on the quota page) or what is left.
+ * - `mode`: show what is left (`remaining`, the default) or usage (`used`).
  *   Values are stored as remaining everywhere; only the display flips.
  * - `atPace`: ids of meters that run out before their reset at the current
  *   pace; their bars turn red whatever their level.
@@ -14,7 +14,7 @@ import type { TFunction } from 'i18next';
 
 export type QuotaDisplayMode = 'used' | 'remaining';
 
-export const QUOTA_DISPLAY_MODES: readonly QuotaDisplayMode[] = ['used', 'remaining'];
+export const QUOTA_DISPLAY_MODES: readonly QuotaDisplayMode[] = ['remaining', 'used'];
 
 export interface MeterDisplay {
   mode: QuotaDisplayMode;

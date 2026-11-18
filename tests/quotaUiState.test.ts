@@ -7,15 +7,20 @@
  */
 
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
-import { readQuotaUiState, writeQuotaUiState } from '@/features/quota/uiState';
+import {
+  readQuotaPreferences,
+  readQuotaUiState,
+  writeQuotaPreferences,
+  writeQuotaUiState,
+} from '@/features/quota/uiState';
 
 const KEY = 'quotaPage.uiState';
 
 /** Test files share one process — leaving a fake `window` behind would leak. */
 const originalWindow = (globalThis as { window?: unknown }).window;
 
-/** bun's global has no sessionStorage; a Map-backed stub is enough here. */
-function installSessionStorage() {
+/** bun's global has no web storage; a Map-backed stub is enough here. */
+function mapStorage() {
   const store = new Map<string, string>();
   const storage = {
     getItem: (key: string) => store.get(key) ?? null,
@@ -27,14 +32,19 @@ function installSessionStorage() {
       return store.size;
     },
   };
-  (globalThis as unknown as { window: unknown }).window = { sessionStorage: storage };
   return storage;
 }
 
-let storage: ReturnType<typeof installSessionStorage>;
+let storage: ReturnType<typeof mapStorage>;
+let local: ReturnType<typeof mapStorage>;
 
 beforeEach(() => {
-  storage = installSessionStorage();
+  storage = mapStorage();
+  local = mapStorage();
+  (globalThis as unknown as { window: unknown }).window = {
+    sessionStorage: storage,
+    localStorage: local,
+  };
 });
 
 afterAll(() => {
@@ -76,5 +86,23 @@ describe('quota ui state', () => {
 
     storage.setItem(KEY, '"a string"');
     expect(readQuotaUiState()).toBeNull();
+  });
+});
+
+describe('quota display preference', () => {
+  test('meters show what is left by default', () => {
+    expect(readQuotaPreferences().displayMode).toBe('remaining');
+  });
+
+  test('a saved used view from before the remaining default does not stick', () => {
+    // Every earlier write saved the whole object, the `used` default included.
+    local.setItem('quotaPage.preferences', JSON.stringify({ displayMode: 'used' }));
+    expect(readQuotaPreferences().displayMode).toBe('remaining');
+  });
+
+  test('a used view picked now survives other preference writes', () => {
+    writeQuotaPreferences({ displayMode: 'used' });
+    writeQuotaPreferences({ showEmails: true });
+    expect(readQuotaPreferences()).toMatchObject({ displayMode: 'used', showEmails: true });
   });
 });
