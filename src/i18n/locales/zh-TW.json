@@ -601,7 +601,9 @@
     "window_duration_hours": "{{hours}} 小時週期",
     "weekly": "每週額度",
     "unknown": "未知",
-    "remaining": "剩餘 {{percent}}%"
+    "remaining": "剩餘 {{percent}}%",
+    "window_idle": "下次請求時開始",
+    "last_known": "上次已知"
   },
   "plugin_quota": {
     "empty_title": "暫無插件憑證",

@@ -605,7 +605,9 @@
     "window_duration_hours": "Период: {{hours}} ч.",
     "weekly": "Недельная квота",
     "unknown": "Неизвестно",
-    "remaining": "Осталось {{percent}}%"
+    "remaining": "Осталось {{percent}}%",
+    "window_idle": "Начнётся при следующем запросе",
+    "last_known": "Последнее известное"
   },
   "plugin_quota": {
     "empty_title": "Нет файлов плагинов",

@@ -41,7 +41,8 @@ for (const hasUsage of [true, false]) {
       const state = META_CONFIG.buildSuccessState(data);
       expect(state.status).toBe('success');
       expect(state.data?.windows.map((window) => window.usedPercent)).toEqual(
-        hasUsage ? [2, 0] : [null, null]
+        // Without usage the active subscription has no open 5-hour window.
+        hasUsage ? [2, 0] : [0, null]
       );
       for (const secret of ['dca:', 'LLM|', 'fixture@example.invalid', 'Fixture User']) {
         expect(JSON.stringify(state)).not.toContain(secret);

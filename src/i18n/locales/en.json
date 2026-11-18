@@ -615,7 +615,9 @@
     "window_duration_hours": "{{hours}}-hour window",
     "weekly": "Weekly quota",
     "unknown": "Unknown",
-    "remaining": "{{percent}}% remaining"
+    "remaining": "{{percent}}% remaining",
+    "window_idle": "Starts on the next request",
+    "last_known": "Last known"
   },
   "kimi_quota": {
     "title": "Kimi Quota",

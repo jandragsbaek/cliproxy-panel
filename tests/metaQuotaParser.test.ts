@@ -45,13 +45,22 @@ describe('Meta Muse quota parser', () => {
       { subs_usage: null },
       { subs_usage: {} },
       { subs_usage: { window: null, weekly: {} } },
-      { ...metaQuotaResponse, subs_usage: undefined },
+      { is_subs_active: true, subs_usage: {} },
     ]) {
       expect(parseMetaQuotaPayload(payload)?.windows).toEqual([
         { id: 'window', usedPercent: null },
         { id: 'weekly', usedPercent: null },
       ]);
     }
+  });
+
+  test('an active subscription without usage has an idle short window and unknown weekly', () => {
+    // Meta sends no subs_usage while no 5-hour window is open.
+    const quota = parseMetaQuotaPayload({ ...metaQuotaResponse, subs_usage: undefined });
+    expect(quota?.windows).toEqual([
+      { id: 'window', usedPercent: 0, durationMinutes: 300, idle: true },
+      { id: 'weekly', usedPercent: null },
+    ]);
   });
 
   test('never turns invalid percentages into zero', () => {

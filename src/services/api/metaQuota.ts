@@ -39,11 +39,18 @@ const parseWindow = (
   };
 };
 
+/** Meta's short window is five hours long today. */
+export const META_SESSION_MINUTES = 5 * 60;
+
 /**
  * Parse only fields used by the quota UI. The upstream response may also carry
  * api_key and PII; retaining the source object (or spreading it) here is forbidden.
- * A valid object without subs_usage is a successful observation with unknown quota
- * (for example, before the account's first request), not a zero or a request error.
+ *
+ * Meta drops `subs_usage` (both windows) while no 5-hour window is open: after
+ * one ends and before the next request opens a new one. With an active
+ * subscription that reads as an idle short window (nothing used) and an
+ * unknown weekly window; `carryMetaWeekly` fills the weekly one from the last
+ * reading. Without subscription status, missing usage stays unknown, never 0.
  * Invalid response bodies return null so transport/protocol errors stay distinct.
  */
 export function parseMetaQuotaPayload(payload: unknown): MetaQuotaData | null {
@@ -61,6 +68,7 @@ export function parseMetaQuotaPayload(payload: unknown): MetaQuotaData | null {
   const explicitPlan = typeof root.subs_tier_name === 'string' ? root.subs_tier_name.trim() : '';
   const usagePlan = typeof usage.tier === 'string' ? usage.tier.trim() : '';
   const planName = explicitPlan || usagePlan;
+  const idle = root.is_subs_active === true && !isRecord(root.subs_usage);
 
   return {
     ...(planName ? { planName } : {}),
@@ -68,8 +76,48 @@ export function parseMetaQuotaPayload(payload: unknown): MetaQuotaData | null {
       ? { isSubscriptionActive: root.is_subs_active }
       : {}),
     windows: [
-      parseWindow('window', usage.window, true),
+      idle
+        ? { id: 'window', usedPercent: 0, durationMinutes: META_SESSION_MINUTES, idle: true }
+        : parseWindow('window', usage.window, true),
       parseWindow('weekly', usage.weekly, false),
     ],
   };
+}
+
+/**
+ * Keep the weekly window through an idle gap: when `next` has no weekly usage
+ * but its short window is idle, use the previous weekly reading, marked
+ * `lastKnown`, while that reading's reset is still ahead.
+ *
+ * Every request opens a short window, so weekly use can only have moved inside
+ * one. The carry is safe only when no whole window fits between the previous
+ * reading and now: it is measured from the end of the previous open window, or
+ * from the previous idle reading. Use inside the previous open window after
+ * its reading is the one thing it can miss.
+ */
+export function carryMetaWeekly(
+  next: MetaQuotaData,
+  previous: MetaQuotaData | undefined,
+  nowMs: number
+): MetaQuotaData {
+  const idle = next.windows.some((window) => window.id === 'window' && window.idle);
+  const weeklyIndex = next.windows.findIndex((window) => window.id === 'weekly');
+  if (!idle || weeklyIndex === -1 || next.windows[weeklyIndex].usedPercent !== null) return next;
+
+  const short = previous?.windows.find((window) => window.id === 'window');
+  const quietSinceMs = short?.idle
+    ? previous?.observedAtMs
+    : short?.resetAt
+      ? short.resetAt * 1000
+      : undefined;
+  const windowMs = (short?.durationMinutes ?? META_SESSION_MINUTES) * 60_000;
+  if (quietSinceMs === undefined || nowMs - quietSinceMs >= windowMs) return next;
+
+  const last = previous?.windows.find((window) => window.id === 'weekly');
+  if (!last || last.usedPercent === null || !last.resetAt || last.resetAt * 1000 <= nowMs) {
+    return next;
+  }
+  const windows = [...next.windows];
+  windows[weeklyIndex] = { ...last, lastKnown: true };
+  return { ...next, windows };
 }

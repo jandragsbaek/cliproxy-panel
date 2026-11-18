@@ -63,8 +63,14 @@ export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>
                         t('meta_quota.remaining', { percent: Number(remaining.toFixed(1)) })
                       )}
                 </span>
+                {window.idle && (
+                  <span className={classes.quotaReset}>{t('meta_quota.window_idle')}</span>
+                )}
                 {resetDisplay && (
                   <QuotaResetLabel display={resetDisplay} classes={classes} soon={soon} />
+                )}
+                {window.lastKnown && (
+                  <span className={classes.quotaResetRelative}>{t('meta_quota.last_known')}</span>
                 )}
               </div>
             </div>

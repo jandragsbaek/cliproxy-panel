@@ -91,8 +91,14 @@ describe('Meta quota in the forecast', () => {
       stateOf({ subs_usage: { window: { window_duration_mins: 300 }, weekly: {} } })
     );
     expect(meters).toEqual([]);
-    // A successful read before the account's first request has no subs_usage at all.
-    expect(readQuotaMeters('meta', stateOf({ is_subs_active: true }))).toEqual([]);
+  });
+
+  test('an idle short window is a full 5-hour meter with no reset, and weekly stays out', () => {
+    // Meta sends no subs_usage while no 5-hour window is open.
+    const meters = readQuotaMeters('meta', stateOf({ is_subs_active: true }));
+    expect(meters.map(({ id, remaining, resetAtMs }) => ({ id, remaining, resetAtMs }))).toEqual([
+      { id: 'five-hour', remaining: 100, resetAtMs: null },
+    ]);
   });
 
   test('a short window of another length is not filed as the 5-hour window', () => {

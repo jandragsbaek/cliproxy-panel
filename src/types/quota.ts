@@ -338,6 +338,13 @@ export interface MetaQuotaWindow {
   /** Reset instant as Unix seconds, matching the upstream contract. */
   resetAt?: number;
   durationMinutes?: number;
+  /**
+   * Short window only: no window is open. Meta opens one on the next request,
+   * so the whole allowance is free and there is no reset yet.
+   */
+  idle?: boolean;
+  /** Weekly only: Meta sent no usage, so this is the last value it did send. */
+  lastKnown?: boolean;
 }
 
 /** Contains quota/display fields only; credential-bearing response fields are discarded. */
@@ -345,6 +352,8 @@ export interface MetaQuotaData {
   planName?: string;
   isSubscriptionActive?: boolean;
   windows: MetaQuotaWindow[];
+  /** When the panel read this from Meta (Unix ms). */
+  observedAtMs?: number;
 }
 
 export interface MetaQuotaState {
