@@ -46,6 +46,9 @@ describe('Meta Muse quota parser', () => {
       { subs_usage: {} },
       { subs_usage: { window: null, weekly: {} } },
       { is_subs_active: true, subs_usage: {} },
+      { is_subs_active: true, subs_usage: null },
+      { is_subs_active: true, subs_usage: 'malformed' },
+      { is_subs_active: true, subs_usage: [] },
     ]) {
       expect(parseMetaQuotaPayload(payload)?.windows).toEqual([
         { id: 'window', usedPercent: null },

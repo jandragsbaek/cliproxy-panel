@@ -183,6 +183,16 @@ describe('Muse quota UI integration', () => {
     }
   );
 
+  test('a read after a failed refresh still carries the weekly reading', () => {
+    const { setMetaQuota } = useQuotaStore.getState();
+    setMetaQuota({ [file.name]: snapshot() });
+    setMetaQuota((prev) => ({ ...prev, [file.name]: META_CONFIG.buildErrorState('failed') }));
+    const idle = parseMetaQuotaPayload({ ...metaQuotaResponse, subs_usage: undefined })!;
+    setMetaQuota((prev) => ({ ...prev, [file.name]: META_CONFIG.buildSuccessState(idle) }));
+    const weekly = useQuotaStore.getState().metaQuota[file.name].data?.windows[1];
+    expect(weekly).toMatchObject({ usedPercent: 1, lastKnown: true });
+  });
+
   test('later polls in the same idle gap keep the carried weekly reading', () => {
     const { setMetaQuota } = useQuotaStore.getState();
     setMetaQuota({ [file.name]: snapshot() });

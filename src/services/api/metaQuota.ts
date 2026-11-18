@@ -68,7 +68,8 @@ export function parseMetaQuotaPayload(payload: unknown): MetaQuotaData | null {
   const explicitPlan = typeof root.subs_tier_name === 'string' ? root.subs_tier_name.trim() : '';
   const usagePlan = typeof usage.tier === 'string' ? usage.tier.trim() : '';
   const planName = explicitPlan || usagePlan;
-  const idle = root.is_subs_active === true && !isRecord(root.subs_usage);
+  // Omitted, not malformed: a malformed field stays unknown.
+  const idle = root.is_subs_active === true && root.subs_usage === undefined;
 
   return {
     ...(planName ? { planName } : {}),

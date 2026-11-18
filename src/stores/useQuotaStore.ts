@@ -111,13 +111,14 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
       for (const [key, quota] of Object.entries(next)) {
         const previous = state.metaQuota[key];
         if (!previous?.data || quota === previous || quota.data === previous.data) continue;
-        // A read in flight keeps the last data, so the read after an idle gap
-        // can still carry the weekly window (see carryMetaWeekly).
+        // A read in flight or a failed read keeps the last data, so the next
+        // read after an idle gap can still carry the weekly window (see
+        // carryMetaWeekly). Cards show no data for these states.
         const data =
-          quota.status === 'loading' && !quota.data
+          (quota.status === 'loading' || quota.status === 'error') && !quota.data
             ? previous.data
             : quota.status === 'success' && quota.data
-              ? carryMetaWeekly(quota.data, previous.data, Date.now())
+              ? carryMetaWeekly(quota.data, previous.data, quota.data.observedAtMs ?? Date.now())
               : quota.data;
         if (data === quota.data) continue;
         if (retained === next) retained = { ...next };
