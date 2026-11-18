@@ -13,7 +13,12 @@ import { META_CONFIG } from './providers/meta/data';
 import { PLUGIN_CONFIG } from './providers/plugin/data';
 import { XAI_CONFIG } from './providers/xai/data';
 import type { QuotaProviderType } from './providers/types';
-import { QUOTA_TAB_ORDER, type QuotaSortMode, type QuotaTabId } from './constants';
+import {
+  ACTIVE_POLL_PROVIDERS,
+  QUOTA_TAB_ORDER,
+  type QuotaSortMode,
+  type QuotaTabId,
+} from './constants';
 
 const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolean> = {
   antigravity: ANTIGRAVITY_CONFIG.filterFn,
@@ -149,4 +154,27 @@ export function paginate<T>(items: T[], page: number, pageSize: number): QuotaPa
     currentPage,
     totalPages,
   };
+}
+
+/** A poll this close to its interval counts as due (timers drift). */
+const POLL_SLACK_MS = 5_000;
+
+/**
+ * Credentials the background poll reads from upstream now: providers without a
+ * passive snapshot, not mid-read, whose last reading and last poll attempt are
+ * both at least `intervalMs` old. A failed read waits for the next interval.
+ */
+export function activePollTargets(
+  entries: QuotaFileEntry[],
+  quotaStatus: (entry: QuotaFileEntry) => string | undefined,
+  lastActivityMs: (entry: QuotaFileEntry) => number | null,
+  nowMs: number,
+  intervalMs: number
+): QuotaFileEntry[] {
+  return entries.filter((entry) => {
+    if (!ACTIVE_POLL_PROVIDERS.includes(entry.type)) return false;
+    if (quotaStatus(entry) === 'loading') return false;
+    const last = lastActivityMs(entry);
+    return last === null || nowMs - last >= intervalMs - POLL_SLACK_MS;
+  });
 }

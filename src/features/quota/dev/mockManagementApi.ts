@@ -45,6 +45,7 @@ const PROVIDER_TYPES: Record<MockCredential['provider'], string> = {
   codex: 'codex',
   xai: 'xai',
   kimi: 'kimi',
+  meta: 'meta',
 };
 
 const sendJson = (res: MockResponse, status: number, body: unknown) => {
@@ -109,8 +110,16 @@ const credentialFile = (credential: MockCredential) => ({
   disabled: false,
   ...(credential.provider === 'claude' || credential.provider === 'codex'
     ? { quota: passiveQuota(credential, Date.now()) }
-    : {}),
+    : credential.provider === 'meta'
+      ? { quota: { signals: {} } }
+      : {}),
 });
+
+/** The stored auth file, as `/credentials/download` serves it. A fake DCA token. */
+const credentialDownload = (credential: MockCredential) =>
+  credential.provider === 'meta'
+    ? { type: 'meta', email: credential.email, dca_token: `dca:mock-${credential.authIndex}` }
+    : { type: PROVIDER_TYPES[credential.provider], email: credential.email };
 
 const claudeUsage = (credential: MockCredential, nowMs: number) => {
   const weekly = mockWeeklyRemaining(credential, nowMs, nowMs);
@@ -157,6 +166,27 @@ const codexUsage = (credential: MockCredential, nowMs: number) => {
   };
 };
 
+/** Meta's Muse key endpoint: a 5-hour window and a weekly one without a length. */
+const metaUsage = (credential: MockCredential, nowMs: number) => {
+  const weekly = mockWeeklyRemaining(credential, nowMs, nowMs);
+  const fiveHour = mockFiveHour(credential, nowMs);
+  return {
+    subs_tier_name: 'Muse Pro',
+    is_subs_active: true,
+    subs_usage: {
+      window: {
+        used_percent: 100 - fiveHour.remaining,
+        window_duration_mins: 300,
+        resets_at: Math.round(fiveHour.resetAtMs / 1000),
+      },
+      weekly: {
+        used_percent: 100 - weekly,
+        resets_at: Math.round(mockWindowEnd(credential, nowMs, nowMs) / 1000),
+      },
+    },
+  };
+};
+
 const upstreamResponse = (body: Record<string, unknown>) => {
   const credential = MOCK_CREDENTIALS.find((item) => item.authIndex === body.authIndex);
   const url = String(body.url ?? '');
@@ -179,6 +209,7 @@ const upstreamResponse = (body: Record<string, unknown>) => {
   }
   if (url.endsWith('/api/oauth/usage')) return ok(claudeUsage(credential, nowMs));
   if (url.endsWith('/wham/usage')) return ok(codexUsage(credential, nowMs));
+  if (url.endsWith('/muse-code/key')) return ok(metaUsage(credential, nowMs));
   if (url.endsWith('/wham/rate-limit-reset-credits')) {
     return ok({ credits: [], available_count: 0 });
   }
@@ -200,6 +231,12 @@ export function quotaMockApi() {
           const files = MOCK_EMPTY ? [] : MOCK_CREDENTIALS.map(credentialFile);
           console.info(`[quota-mock] credentials (${files.length})`);
           return sendJson(res, 200, { files });
+        }
+        if (req.method === 'GET' && route === '/credentials/download') {
+          const name = new URLSearchParams((req.url ?? '').split('?')[1] ?? '').get('name');
+          const credential = MOCK_CREDENTIALS.find((item) => item.name === name);
+          if (!credential) return sendJson(res, 404, { error: 'not found' });
+          return sendJson(res, 200, credentialDownload(credential));
         }
         if (req.method === 'POST' && route === '/requests/api-call') {
           // Real upstream reads take a moment; the delay makes background
