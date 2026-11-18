@@ -10,7 +10,7 @@
 const HOUR = 3_600_000;
 const WEEK_HOURS = 168;
 
-export type MockProvider = 'claude' | 'codex' | 'xai' | 'kimi';
+export type MockProvider = 'claude' | 'codex' | 'xai' | 'kimi' | 'meta';
 
 export interface MockCredential {
   name: string;
@@ -129,6 +129,16 @@ export const MOCK_CREDENTIALS: MockCredential[] = [
     resetOffsetHours: 60,
     drainPerHour: 0.3,
     failing: true,
+  },
+  {
+    // Muse Code: no passive snapshot (`quota.signals` stays empty, as on a
+    // real hub); the panel polls Meta's key endpoint for it.
+    name: 'muse',
+    email: 'ada@meta-mock.dev',
+    provider: 'meta',
+    authIndex: 'mock-12',
+    resetOffsetHours: 44,
+    drainPerHour: 0.7,
   },
 ];
 

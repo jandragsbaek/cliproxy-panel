@@ -2,9 +2,10 @@
  * Flat per-credential meter readings for the ledger, the provider group totals
  * and the history recorder.
  *
- * Claude, Codex and Devin carry labelled windows with reset instants; the other
- * providers are read through `buildTimelineLane`, which already knows their
- * shapes. Pure and React-free.
+ * Claude, Codex and Devin carry labelled windows with reset instants; Meta's
+ * two windows map onto the same ids (5-hour session window `five-hour`, weekly
+ * `weekly`); the other providers are read through `buildTimelineLane`, which
+ * already knows their shapes. Pure and React-free.
  */
 
 import type { TFunction } from 'i18next';
@@ -45,6 +46,7 @@ interface WindowLike {
 const PRIMARY_WINDOW_ID: Partial<Record<QuotaProviderType, string>> = {
   claude: 'seven-day',
   codex: 'weekly',
+  meta: 'weekly',
   xai: 'window',
 };
 
@@ -88,6 +90,8 @@ export function readQuotaMeters(provider: QuotaProviderType, quota: unknown): Qu
     return markPrimary(meters, PRIMARY_WINDOW_ID[provider]);
   }
 
+  if (provider === 'meta') return markPrimary(readMetaMeters(quota), PRIMARY_WINDOW_ID.meta);
+
   // Other providers: the lane reader knows their shapes; its chosen window
   // (longest that fits a week) is the one with a known reset instant.
   const lane = buildTimelineLane({
@@ -116,6 +120,59 @@ export function readQuotaMeters(provider: QuotaProviderType, quota: unknown): Qu
     else meters.unshift({ id: 'window', label: '', remaining: lane.remaining, ...reading });
   }
   return meters;
+}
+
+interface MetaWindowLike {
+  id?: string;
+  usedPercent?: number | null;
+  /** Unix seconds. */
+  resetAt?: number;
+  durationMinutes?: number;
+}
+
+const META_SESSION_MINUTES = 5 * 60;
+
+/**
+ * Meta's Muse key endpoint reports a short `window` (with its length, 300
+ * minutes today) and a `weekly` window (no length; it is seven days). The
+ * short one files as the 5-hour session window when it is five hours long, so
+ * the forecast, the history and the rate rules treat it like Claude's and
+ * Codex's. Windows with unknown usage are left out, not read as 0 or 100.
+ */
+function readMetaMeters(quota: unknown): QuotaMeterReading[] {
+  const windows = (quota as { data?: { windows?: MetaWindowLike[] } }).data?.windows ?? [];
+  return windows
+    .map((window): QuotaMeterReading | null => {
+      const used = finiteOrNull(window.usedPercent);
+      if (used === null) return null;
+      const resetAt = finiteOrNull(window.resetAt);
+      const resetAtMs = resetAt !== null && resetAt > 0 ? resetAt * 1000 : null;
+      if (window.id === 'weekly') {
+        return {
+          id: 'weekly',
+          label: 'meta_quota.weekly',
+          labelKey: 'meta_quota.weekly',
+          remaining: clampPercent(100 - used),
+          resetAtMs,
+          periodHours: WEEK_HOURS,
+          primary: false,
+        };
+      }
+      if (window.id !== 'window') return null;
+      const minutes = finiteOrNull(window.durationMinutes) ?? META_SESSION_MINUTES;
+      const wholeHours = minutes % 60 === 0;
+      return {
+        id: minutes === META_SESSION_MINUTES ? 'five-hour' : `window-${minutes}`,
+        label: 'meta_quota.window',
+        labelKey: wholeHours ? 'meta_quota.window_duration_hours' : 'meta_quota.window_duration',
+        labelParams: wholeHours ? { hours: minutes / 60 } : { minutes },
+        remaining: clampPercent(100 - used),
+        resetAtMs,
+        periodHours: minutes / 60,
+        primary: false,
+      };
+    })
+    .filter((meter): meter is QuotaMeterReading => meter !== null);
 }
 
 /** Prefer the provider's account window; otherwise the soonest-resetting weekly one. */

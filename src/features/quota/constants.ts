@@ -28,6 +28,18 @@ export const CARD_ENTRANCE_BUDGET_MS = 360;
 /** Page entry refreshes credentials whose shown data is older than this. */
 export const QUOTA_STALE_MS = 5 * 60_000;
 
+/** Background quota poll while the page is visible. */
+export const QUOTA_POLL_MS = 2 * 60_000;
+/** Slower poll while the tab is in the background (browsers throttle timers anyway). */
+export const QUOTA_POLL_HIDDEN_MS = 5 * 60_000;
+
+/**
+ * Providers without a passive quota snapshot on the credential list. The page
+ * reads their quota from upstream on the poll cadence, or their forecast would
+ * only move when someone clicks refresh.
+ */
+export const ACTIVE_POLL_PROVIDERS: readonly QuotaProviderType[] = ['meta'];
+
 /** Card grid (upstream) or one row per credential. */
 export const QUOTA_VIEW_MODES = ['ledger', 'cards'] as const;
 

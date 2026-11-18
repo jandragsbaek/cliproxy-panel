@@ -12,7 +12,11 @@ const SEEDED_KEY = 'quotaMock.seeded';
 const STEP_MS = 20 * MINUTE_MS;
 const GAP = { fromHoursAgo: 14, toHoursAgo: 8 };
 
-const PRIMARY_WINDOW: Record<string, string> = { claude: 'seven-day', codex: 'weekly' };
+const PRIMARY_WINDOW: Record<string, string> = {
+  claude: 'seven-day',
+  codex: 'weekly',
+  meta: 'weekly',
+};
 
 export async function seedMockHistory(connection: string): Promise<void> {
   const seededKey = `${SEEDED_KEY}:${connection}`;

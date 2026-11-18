@@ -3,6 +3,7 @@
  *
  * 保留的行为契约（重设计不改）：
  * - 现有提供商保持点击加载；Devin 首次可见时主动查询一次，不轮询；
+ * - 没有被动快照的提供商（Meta）按列表轮询节奏主动查询（useActiveQuotaPoll）；
  * - cacheGeneration 会话隔离 + request-id 去重（见 useQuotaBatchLoader）；
  * - 文件列表变化后按 provider 剪枝额度缓存（已删文件不残留）；
  * - useHeaderRefresh 单槽位：本页唯一注册者，全局刷新 = 重取文件列表。
@@ -31,6 +32,8 @@ import { QuotaLedger } from './components/QuotaLedger';
 import {
   CARD_ENTRANCE_BUDGET_MS,
   QUOTA_PAGE_SIZE,
+  QUOTA_POLL_HIDDEN_MS,
+  QUOTA_POLL_MS,
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
   QUOTA_STALE_MS,
@@ -53,6 +56,7 @@ import { nextRecoveryMs } from './resetSchedule';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
 import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
+import { useActiveQuotaPoll } from './hooks/useActiveQuotaPoll';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { stripCredentialExtension } from './display';
@@ -71,10 +75,6 @@ import {
 import styles from './QuotaPage.module.scss';
 
 const SKELETON_CARD_COUNT = 6;
-/** Background re-read of the credential list (passive quota snapshots). */
-const FILES_POLL_MS = 2 * 60_000;
-/** Slower re-read while the tab is in the background (browsers throttle timers anyway). */
-const FILES_POLL_HIDDEN_MS = 5 * 60_000;
 /** Chart heights: one provider gets room; All stacks several compact ones. */
 const PROVIDER_TAB_CHART_HEIGHT = 160;
 const ALL_TAB_CHART_HEIGHT = 112;
@@ -157,12 +157,13 @@ export function QuotaPage() {
   useHeaderRefresh(loadFiles);
 
   /* ---------- 后台轮询凭证列表 ----------
-   * Re-read the credential list every FILES_POLL_MS while the page is
-   * visible, and every FILES_POLL_HIDDEN_MS while the tab is in the
+   * Re-read the credential list every QUOTA_POLL_MS while the page is
+   * visible, and every QUOTA_POLL_HIDDEN_MS while the tab is in the
    * background (the user is typically working in a terminal then, which is
    * exactly the usage worth recording). The list carries the server's passive
-   * quota snapshot, so no upstream provider is called. An explicit load in
-   * flight or started meanwhile always wins. */
+   * quota snapshot, so no upstream provider is called (providers without one
+   * are read by useActiveQuotaPoll). An explicit load in flight or started
+   * meanwhile always wins. */
 
   const loadingRef = useRef(loading);
   useEffect(() => {
@@ -191,13 +192,13 @@ export function QuotaPage() {
     if (connectionStatus !== 'connected') return;
     const pollIfDue = () => {
       const interval =
-        document.visibilityState === 'visible' ? FILES_POLL_MS : FILES_POLL_HIDDEN_MS;
+        document.visibilityState === 'visible' ? QUOTA_POLL_MS : QUOTA_POLL_HIDDEN_MS;
       if (Date.now() - lastPollRef.current >= interval - 5_000) void pollFiles();
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') pollIfDue();
     };
-    const timer = window.setInterval(pollIfDue, FILES_POLL_MS);
+    const timer = window.setInterval(pollIfDue, QUOTA_POLL_MS);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.clearInterval(timer);
@@ -530,6 +531,17 @@ export function QuotaPage() {
     disableControls ||
       loading ||
       batchLoading ||
+      Boolean(error) ||
+      filesGeneration !== sessionGeneration,
+    loadQuota
+  );
+
+  useActiveQuotaPoll(
+    entries,
+    getQuota,
+    !hydrated ||
+      disableControls ||
+      loading ||
       Boolean(error) ||
       filesGeneration !== sessionGeneration,
     loadQuota

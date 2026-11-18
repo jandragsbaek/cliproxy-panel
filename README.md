@@ -4,7 +4,7 @@
 
 # CLIProxyAPI Panel
 
-**Know when your Claude and Codex quota runs out before it does.**
+**Know when your Claude, Codex and Muse (Meta) quota runs out before it does.**
 
 A management panel for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) with quota forecasting,<br>
 burn-rate predictions and privacy blur. Ships as a single HTML file.
@@ -27,7 +27,8 @@ This is a fork of the official [CLI Proxy API Management Center](https://github.
 - **Plain-language outlook.** "First account runs out in 2d 1h (Sun, Oct 25, 7:51 PM)" or "Lasts until reset · ~46% unused", per provider and per account.
 - **Accounts that are out.** Flagged with when they come back ("out now · back in 2d 1h"), and their pace still counts.
 - **Drain rate chart.** Measured rate where history exists, with the window average as a dotted reference line.
-- **No extra provider calls.** Reads the passive quota snapshot CLIProxyAPI already keeps from real traffic, polled every 2 minutes while the page is open.
+- **No extra provider calls for Claude and Codex.** Reads the passive quota snapshot CLIProxyAPI already keeps from real traffic, polled every 2 minutes while the page is open.
+- **Muse (Meta) too.** Meta credentials carry no passive snapshot, so the page reads Meta's quota endpoint through CLIProxyAPI on the same 2-minute cadence (5 minutes while the tab is hidden). Its 5-hour and weekly windows forecast like the others.
 - **Cached on load.** Last known values show immediately, then refresh in the background.
 - **Privacy blur.** Emails and account names are blurred by default. Click one to reveal it, or use "Show emails".
 - **Ledger view.** One compact row per account, next to the original card grid.
