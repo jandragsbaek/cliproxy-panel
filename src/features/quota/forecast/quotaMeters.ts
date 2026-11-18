@@ -9,6 +9,7 @@
  */
 
 import type { TFunction } from 'i18next';
+import { META_SESSION_MINUTES } from '@/services/api/metaQuota';
 import { buildTimelineLane } from '../quotaTimelineModel';
 import type { QuotaProviderType } from '../providers/types';
 
@@ -59,8 +60,8 @@ const finiteOrNull = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 export function readQuotaMeters(provider: QuotaProviderType, quota: unknown): QuotaMeterReading[] {
-  // Loading states keep the previous read (Claude retains its windows); other
-  // providers' loading states are empty and read as no meters.
+  // Loading states keep the previous read (Claude retains its windows, Meta
+  // its data); other providers' loading states are empty and read as no meters.
   const state = quota as { status?: string } | undefined;
   if (!state || (state.status !== 'success' && state.status !== 'loading')) return [];
 
@@ -129,8 +130,6 @@ interface MetaWindowLike {
   resetAt?: number;
   durationMinutes?: number;
 }
-
-const META_SESSION_MINUTES = 5 * 60;
 
 /**
  * Meta's Muse key endpoint reports a short `window` (with its length, 300

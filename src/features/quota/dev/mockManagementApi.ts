@@ -16,9 +16,16 @@ import {
 
 const PREFIX = '/v8/management';
 /** `VITE_QUOTA_MOCK_EMPTY=1 bun run dev:mock` serves no credentials (empty states). */
-const MOCK_EMPTY =
-  (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env
-    .VITE_QUOTA_MOCK_EMPTY === '1';
+const MOCK_ENV =
+  (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
+const MOCK_EMPTY = MOCK_ENV.VITE_QUOTA_MOCK_EMPTY === '1';
+/**
+ * `VITE_QUOTA_MOCK_META_IDLE=1 bun run dev:mock`: after the first read, Meta
+ * answers like it does once a 5-hour window has ended and before the next
+ * request opens one: no `subs_usage` at all.
+ */
+const MOCK_META_IDLE = MOCK_ENV.VITE_QUOTA_MOCK_META_IDLE === '1';
+const metaReadCounts = new Map<string, number>();
 const MOCK_LATENCY_MS = 1500;
 
 /* Minimal structural types so this file needs no Node type definitions. */
@@ -170,6 +177,9 @@ const codexUsage = (credential: MockCredential, nowMs: number) => {
 const metaUsage = (credential: MockCredential, nowMs: number) => {
   const weekly = mockWeeklyRemaining(credential, nowMs, nowMs);
   const fiveHour = mockFiveHour(credential, nowMs);
+  const reads = (metaReadCounts.get(credential.authIndex) ?? 0) + 1;
+  metaReadCounts.set(credential.authIndex, reads);
+  if (MOCK_META_IDLE && reads > 1) return { subs_tier_name: 'Muse Pro', is_subs_active: true };
   return {
     subs_tier_name: 'Muse Pro',
     is_subs_active: true,

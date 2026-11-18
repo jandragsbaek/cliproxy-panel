@@ -2331,7 +2331,9 @@
     "window_duration_hours": "Chu kỳ {{hours}} giờ",
     "weekly": "Quota hàng tuần",
     "unknown": "Không rõ",
-    "remaining": "Còn lại {{percent}}%"
+    "remaining": "Còn lại {{percent}}%",
+    "window_idle": "Bắt đầu ở yêu cầu tiếp theo",
+    "last_known": "Giá trị đã biết gần nhất"
   },
   "claude_reset": {
     "expiry_title": "Hết hạn đặt lại thủ công ({{timezone}})",

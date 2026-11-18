@@ -22,7 +22,7 @@ export const META_CONFIG: QuotaProviderData<MetaQuotaState, MetaQuotaData> = {
   filterFn: (file) => resolveAuthProvider(file) === 'meta' && !isDisabledAuthFile(file),
   fetchQuota: async (file, t: TFunction) => {
     try {
-      return await fetchMetaQuota(file);
+      return { ...(await fetchMetaQuota(file)), observedAtMs: Date.now() };
     } catch (error: unknown) {
       if (error instanceof MetaQuotaError) {
         error.message = t(`meta_quota.${error.code}`, { status: error.status });

@@ -601,7 +601,9 @@
     "window_duration_hours": "{{hours}} 小时周期",
     "weekly": "每周额度",
     "unknown": "未知",
-    "remaining": "剩余 {{percent}}%"
+    "remaining": "剩余 {{percent}}%",
+    "window_idle": "下次请求时开始",
+    "last_known": "上次已知"
   },
   "plugin_quota": {
     "empty_title": "暂无插件凭证",

@@ -3,6 +3,7 @@
  */
 
 import { create } from 'zustand';
+import { carryMetaWeekly } from '@/services/api/metaQuota';
 import { getQuotaCacheFileName } from '@/utils/quota/identity';
 import type {
   AntigravityQuotaState,
@@ -104,7 +105,27 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
       kimiQuota: resolveUpdater(updater, state.kimiQuota),
     })),
   setMetaQuota: (updater) =>
-    set((state) => ({ metaQuota: resolveUpdater(updater, state.metaQuota) })),
+    set((state) => {
+      const next = resolveUpdater(updater, state.metaQuota);
+      let retained = next;
+      for (const [key, quota] of Object.entries(next)) {
+        const previous = state.metaQuota[key];
+        if (!previous?.data || quota === previous || quota.data === previous.data) continue;
+        // A read in flight or a failed read keeps the last data, so the next
+        // read after an idle gap can still carry the weekly window (see
+        // carryMetaWeekly). Cards show no data for these states.
+        const data =
+          (quota.status === 'loading' || quota.status === 'error') && !quota.data
+            ? previous.data
+            : quota.status === 'success' && quota.data
+              ? carryMetaWeekly(quota.data, previous.data, quota.data.observedAtMs ?? Date.now())
+              : quota.data;
+        if (data === quota.data) continue;
+        if (retained === next) retained = { ...next };
+        retained[key] = { ...quota, data };
+      }
+      return { metaQuota: retained };
+    }),
   setPluginQuota: (updater) =>
     set((state) => ({
       pluginQuota: resolveUpdater(updater, state.pluginQuota),

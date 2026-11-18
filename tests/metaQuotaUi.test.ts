@@ -64,6 +64,8 @@ describe('Muse quota UI integration', () => {
         'weekly',
         'unknown',
         'remaining',
+        'window_idle',
+        'last_known',
       ]) {
         expect(translations.meta_quota[key]).toBeTruthy();
       }
@@ -146,6 +148,64 @@ describe('Muse quota UI integration', () => {
     expect(markup).not.toContain('role="meter"');
     expect(markup).not.toContain('width:100%');
     expect(markup).not.toContain('LLM|');
+  });
+
+  const sixHoursAgo = Math.floor(Date.now() / 1000) - 6 * 3600;
+  test.each([
+    ['keeps the weekly reading', 4070995200, 4071513600, true],
+    ['drops a weekly reading whose reset has passed', 4070995200, 1, false],
+    // A whole window may have opened and closed since, so weekly use may have moved.
+    ['drops a weekly reading from before a 5-hour gap', sixHoursAgo, 4071513600, false],
+  ])(
+    'a refresh while no 5-hour window is open %s',
+    (_label, windowResetAt, weeklyResetAt, carried) => {
+      const previous = snapshot();
+      previous.data!.windows[0].resetAt = windowResetAt;
+      previous.data!.windows[1].resetAt = weeklyResetAt;
+      const { setMetaQuota } = useQuotaStore.getState();
+      setMetaQuota({ [file.name]: previous });
+      setMetaQuota((prev) => ({ ...prev, [file.name]: META_CONFIG.buildLoadingState() }));
+      const idle = parseMetaQuotaPayload({ ...metaQuotaResponse, subs_usage: undefined })!;
+      setMetaQuota((prev) => ({ ...prev, [file.name]: META_CONFIG.buildSuccessState(idle) }));
+
+      const quota = useQuotaStore.getState().metaQuota[file.name];
+      const markup = renderToStaticMarkup(createElement(MetaQuotaBody, { quota, classes }));
+      expect(markup).toContain(i18n.t('meta_quota.window_idle'));
+      expect(markup).toContain('aria-valuenow="100"');
+      expect(markup).not.toContain(i18n.t('meta_quota.empty_data'));
+      if (carried) {
+        expect(markup).toContain('aria-valuenow="99"');
+        expect(markup).toContain(i18n.t('meta_quota.last_known'));
+      } else {
+        expect(markup).toContain(i18n.t('meta_quota.unknown'));
+        expect(markup).not.toContain(i18n.t('meta_quota.last_known'));
+      }
+    }
+  );
+
+  test('a read after a failed refresh still carries the weekly reading', () => {
+    const { setMetaQuota } = useQuotaStore.getState();
+    setMetaQuota({ [file.name]: snapshot() });
+    setMetaQuota((prev) => ({ ...prev, [file.name]: META_CONFIG.buildErrorState('failed') }));
+    const idle = parseMetaQuotaPayload({ ...metaQuotaResponse, subs_usage: undefined })!;
+    setMetaQuota((prev) => ({ ...prev, [file.name]: META_CONFIG.buildSuccessState(idle) }));
+    const weekly = useQuotaStore.getState().metaQuota[file.name].data?.windows[1];
+    expect(weekly).toMatchObject({ usedPercent: 1, lastKnown: true });
+  });
+
+  test('later polls in the same idle gap keep the carried weekly reading', () => {
+    const { setMetaQuota } = useQuotaStore.getState();
+    setMetaQuota({ [file.name]: snapshot() });
+    const idle = parseMetaQuotaPayload({ ...metaQuotaResponse, subs_usage: undefined })!;
+    for (const minutesAgo of [4, 2]) {
+      const observedAtMs = Date.now() - minutesAgo * 60_000;
+      setMetaQuota((prev) => ({
+        ...prev,
+        [file.name]: META_CONFIG.buildSuccessState({ ...idle, observedAtMs }),
+      }));
+    }
+    const weekly = useQuotaStore.getState().metaQuota[file.name].data?.windows[1];
+    expect(weekly).toMatchObject({ usedPercent: 1, lastKnown: true });
   });
 
   test('invalidates file-scoped and session caches and rejects stale writes', () => {
